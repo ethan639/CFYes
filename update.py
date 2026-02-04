@@ -2,9 +2,9 @@ import requests
 import base64
 import json
 import os
+from datetime import datetime, timedelta
 
 # ================= 配置区 =================
-# UUID 和 HOST 已更新为您的最新配置
 USER_ID = os.environ.get("USER_ID", "63e36f02-9f04-4c72-b6b3-ccf59a72fff0")
 HOST = os.environ.get("HOST", "gvm.cotco.dns-dynamic.net")
 # ==========================================
@@ -14,7 +14,6 @@ PORT = 443
 KEY = "o1zrmHAF" 
 
 def get_optimization_ip():
-    """获取 API 实时优选数据"""
     url = 'https://api.hostmonit.com/get_optimization_ip'
     headers = {'Content-Type': 'application/json'}
     data = {"key": KEY, "type": "v4"}
@@ -32,7 +31,11 @@ def main():
         print("未能获取到 IP 数据")
         return
 
-    # 1. 汇总所有线路数据到单一列表进行排序
+    # 生成北京时间时间戳 (UTC+8)
+    utc_now = datetime.utcnow()
+    beijing_time = (utc_now + timedelta(hours=8)).strftime("%H:%M")
+
+    # 1. 汇总所有线路数据
     raw_ips = []
     lines_map = {"CM": "移动", "CU": "联通", "CT": "电信"}
     
@@ -40,11 +43,10 @@ def main():
     for code, name in lines_map.items():
         line_data = info_data.get(code, [])
         for item in line_data:
-            item['line_name'] = name # 注入中文线路名
+            item['line_name'] = name
             raw_ips.append(item)
 
-    # 2. 核心优化：根据延迟由低到高排序
-    # 处理延迟字符串（如 "51ms" -> 51），无法解析的排在最后
+    # 2. 根据延迟从小到大排序
     def sort_key(x):
         try:
             return int(x.get("latency", "999").replace("ms", ""))
@@ -64,10 +66,9 @@ def main():
         if not ip:
             continue
         
-        # 备注格式：移动_LAX_51ms
-        remark = f"{name}_{colo}_{latency}"
+        # 备注格式：线路_地区_延迟_时间 (例如: 移动_LAX_51ms_08:45)
+        remark = f"{name}_{colo}_{latency}_{beijing_time}"
         
-        # 构造 VLESS 链接
         link = f"vless://{USER_ID}@{ip}:{PORT}?encryption=none&security=tls&sni={HOST}&type=ws&host={HOST}&path={PATH}#{remark}"
         links.append(link)
 
@@ -75,14 +76,14 @@ def main():
         print("链接列表为空")
         return
 
-    # 4. Base64 编码并导出 sub.txt
+    # 4. Base64 编码并保存
     combined = "\n".join(links)
     final_sub = base64.b64encode(combined.encode('utf-8')).decode('utf-8')
 
     with open("sub.txt", "w", encoding="utf-8") as f:
         f.write(final_sub)
     
-    print(f"成功更新 sub.txt！已根据延迟对 {len(links)} 个节点进行升序排列。")
+    print(f"[{beijing_time}] 成功更新 sub.txt，节点已按延迟排序并添加时间戳。")
 
 if __name__ == "__main__":
     main()
