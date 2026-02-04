@@ -9,18 +9,27 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          persist-credentials: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
         with:
           python-version: '3.9'
-      - name: Run
+
+      - name: Run Script
         run: |
           pip install requests
           python update.py
-      - name: Push
+
+      - name: Push Changes
         run: |
-          git config --local user.email "actions@github.com"
-          git config --local user.name "github-actions"
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
           git add sub.txt
-          git commit -m "Update nodes" || exit 0
-          git push
+          # 如果文件没变化就不提交，防止报错
+          git diff --quiet && git diff --staged --quiet || (git commit -m "Update nodes $(date)" && git push)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
