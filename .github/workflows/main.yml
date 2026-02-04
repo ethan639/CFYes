@@ -8,13 +8,11 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    permissions: # 显式声明读写权限
-      contents: write
+    permissions:
+      contents: write # 显式授予写权限
     steps:
       - name: Checkout
         uses: actions/checkout@v3
-        with:
-          persist-credentials: true
 
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -28,10 +26,15 @@ jobs:
 
       - name: Commit and Push
         run: |
-          git config --local user.email "actions@github.com"
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           git add sub.txt
-          # 仅在有变动时提交，避免工作流报错
-          git diff --quiet && git diff --staged --quiet || (git commit -m "Update sub: $(date)" && git push origin main)
+          # 检查是否有内容变化，防止空提交报错
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Update subscription $(date)"
+            git push
+          fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
