@@ -26,6 +26,13 @@ jobs:
         run: |
           git config --local user.email "actions@github.com"
           git config --local user.name "GitHub Action"
-          git add sub.txt
-          git commit -m "Update subscription" || exit 0
-          git push
+          # 检查 sub.txt 是否真的有内容
+          if [ -s sub.txt ]; then
+            git add -f sub.txt
+            # 如果没有变化则跳过，有变化则强制推送
+            git commit -m "Auto update subscription: $(date)" || echo "No changes to commit"
+            git push -f origin main
+          else
+            echo "错误：sub.txt 是空的，取消推送！"
+            exit 1
+          fi
