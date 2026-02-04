@@ -12,10 +12,10 @@ MAX_COUNT = 30
 # ==========================================
 
 def get_ips():
-    """使用对 GitHub Actions 友好的备用接口抓取大量 IP"""
+    """使用对 GitHub Actions 极其友好的备用接口抓取大量 IP"""
     ips = []
     try:
-        # 这个接口专门解决 API 屏蔽 GitHub 的问题
+        # 这个接口专门解决 API 屏蔽 GitHub 自动运行环境的问题
         res = requests.get("https://cf.090227.xyz/getIP", timeout=15).json()
         if isinstance(res, list):
             for i in res:
@@ -43,15 +43,15 @@ def main():
     ip_data = get_ips()
     links = []
     
-    # 过滤掉 1.0.x.x 等无效 IP
+    # 过滤掉 1.0.x.x 等无效假 IP
     valid_ips = [i for i in ip_data if not i['ip'].startswith(("1.0.", "1.1.", "1.2."))]
     
     if valid_ips:
         for item in valid_ips[:MAX_COUNT]:
             ip = item['ip']
-            # 备注包含延迟信息
+            # 备注包含线路和延迟信息
             remark = f"CF_优选_{item.get('line','HK')}_{item.get('latency','0')}ms"
-            # 这里的参数必须和你之前“可用”的节点完全一致
+            # 核心：无论连接哪个 IP，SNI 必须是你验证过的域名
             link = f"vless://{USER_ID}@{ip}:{PORT}?encryption=none&security=tls&sni={HOST}&type=ws&host={HOST}&path={PATH}#{remark}"
             links.append(link)
     
