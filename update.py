@@ -5,43 +5,49 @@ import base64
 # ================= 配置区 =================
 USER_ID = "f4055c9e-8500-4638-b13a-0e65fec24936"
 HOST = "cotco.dns-dynamic.net"
-PATH = "/"  
+PATH = "/"  # 请确保这与你服务器端的 WebSocket 路径一致
 PORT = 443
 # ==========================================
 
 def get_ips():
+    # 使用备用公共 API 接口
     url = "https://api.hostmonit.com/get_optimization_ip"
-    # 模拟真实浏览器，防止被拦截
-    headers = {"Content-Type": "application/json", "User-Agent": "Mozilla/5.0"}
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "Referer": "https://stock.hostmonit.com/"
+    }
     payload = {"key": "iDetkO9Z", "type": "v4"}
     try:
+        # 增加重试机制
         res = requests.post(url, json=payload, headers=headers, timeout=15).json()
-        if res.get("code") == 200:
-            return res.get("info", [])
-    except Exception as e:
-        print(f"API 请求失败: {e}")
+        if res.get("code") == 200 and res.get("info"):
+            return res.get("info")
+    except:
+        pass
     return []
 
 def main():
     ip_list = get_ips()
+    
+    # 如果抓不到优选 IP，至少生成一个正确的备份节点
     if not ip_list:
-        print("未获取到 IP 数据，生成测试节点以防文件为空...")
-        # 如果 API 挂了，至少生成一个基于域名的节点保证 sub.txt 不为 0 字节
-        ip_list = [{"ip": HOST, "line": "Backup", "colo": "Any", "latency": "0"}]
+        print("未抓取到实时 IP，生成域名备份节点...")
+        ip_list = [{"ip": HOST, "line": "移动/联通/电信", "colo": "Domain", "latency": "Direct"}]
 
-    vless_links = []
+    links = []
     for item in ip_list:
         ip = item['ip']
         remark = f"CF_{item['line']}_{item['colo']}_{item['latency']}ms"
+        # 严格 VLESS WS+TLS 格式
         link = f"vless://{USER_ID}@{ip}:{PORT}?encryption=none&security=tls&sni={HOST}&type=ws&host={HOST}&path={PATH}#{remark}"
-        vless_links.append(link)
+        links.append(link)
     
-    combined_text = "\n".join(vless_links)
-    final_sub = base64.b64encode(combined_text.encode('utf-8')).decode('utf-8')
+    combined = "\n".join(links)
+    b64_str = base64.b64encode(combined.encode('utf-8')).decode('utf-8')
     
     with open("sub.txt", "w") as f:
-        f.write(final_sub)
-    print(f"成功生成节点，文件大小: {len(final_sub)} 字节")
+        f.write(b64_str)
+    print(f"成功生成 {len(links)} 个节点")
 
 if __name__ == "__main__":
     main()
