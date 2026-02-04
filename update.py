@@ -5,7 +5,7 @@ import random
 
 # ================= 配置区 =================
 USER_ID = "f4055c9e-8500-4638-b13a-0e65fec24936"
-HOST = "cotco.dns-dynamic.net"
+HOST = "cs.cotco.dns-dynamic.net"
 PATH = "/"  
 PORT = 443
 # ==========================================
