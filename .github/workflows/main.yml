@@ -1,17 +1,23 @@
 name: Auto Update CF IP
+
 on:
   schedule:
-    - cron: '0 */6 * * *'
-  workflow_dispatch:
+    - cron: '0 */6 * * *' # 每 6 小时自动运行一次
+  workflow_dispatch: # 支持手动点击运行
+
 jobs:
   build:
     runs-on: ubuntu-latest
+    
+    # 核心修复 1：显式声明对内容的写权限
     permissions:
       contents: write
+
     steps:
-      - name: Checkout
+      - name: Checkout Repository
         uses: actions/checkout@v3
         with:
+          # 核心修复 2：持久化凭据以允许后续 Push
           persist-credentials: true
 
       - name: Set up Python
@@ -19,17 +25,25 @@ jobs:
         with:
           python-version: '3.9'
 
-      - name: Run Script
-        run: |
-          pip install requests
-          python update.py
+      - name: Install Dependencies
+        run: pip install requests
 
-      - name: Push Changes
+      - name: Run Update Script
+        run: python update.py
+
+      - name: Commit and Push Changes
+        # 核心修复 3：使用 GITHUB_TOKEN 进行身份验证
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           git add sub.txt
-          # 如果文件没变化就不提交，防止报错
-          git diff --quiet && git diff --staged --quiet || (git commit -m "Update nodes $(date)" && git push)
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          
+          # 检查文件是否有变化，避免无意义的提交导致报错
+          if git diff --staged --quiet; then
+            echo "No changes in sub.txt, skipping push."
+          else
+            git commit -m "Auto-update subscription nodes: $(date)"
+            git push origin main
+          fi
