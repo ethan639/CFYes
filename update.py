@@ -3,26 +3,31 @@ import base64
 
 # ================= 配置区 =================
 USER_ID = "f4055c9e-8500-4638-b13a-0e65fec24936"
-# 使用你已经验证可用的子域名
+# 保持使用你验证可用的子域名
 HOST = "cs.cotco.dns-dynamic.net" 
 PATH = "/"  
 PORT = 443
-MAX_IP_COUNT = 30  # 设置你想要抓取的 IP 数量
+# 你想要抓取的有效 IP 数量
+MAX_COUNT = 30 
 # ==========================================
 
 def get_ips():
-    """多源抓取逻辑：确保在 GitHub 环境下也能拿到大量 IP"""
+    """使用对 GitHub Actions 友好的备用接口抓取大量 IP"""
     ips = []
-    # 源 1: 对 GitHub 极其友好的公共接口
     try:
-        res = requests.get("https://cf.090227.xyz/getIP", timeout=10).json()
+        # 这个接口专门解决 API 屏蔽 GitHub 的问题
+        res = requests.get("https://cf.090227.xyz/getIP", timeout=15).json()
         if isinstance(res, list):
             for i in res:
-                ips.append({"ip": i['Address'], "line": "CM", "latency": i['Latency']})
-    except:
-        pass
+                ips.append({
+                    "ip": i['Address'], 
+                    "line": "CM", # 移动线路通常最快
+                    "latency": i['Latency']
+                })
+    except Exception as e:
+        print(f"备用接口抓取失败: {e}")
     
-    # 源 2: 你的原始 API (作为备用)
+    # 如果备用接口也挂了，才尝试原始 API
     if not ips:
         url = "https://api.hostmonit.com/get_optimization_ip"
         payload = {"key": "iDetkO9Z", "type": "v4"}
@@ -35,22 +40,23 @@ def get_ips():
     return ips
 
 def main():
-    ip_list = get_ips()
+    ip_data = get_ips()
     links = []
     
-    # 如果抓到了数据，过滤掉假 IP (1.0.x.x)
-    valid_ips = [i for i in ip_list if not i['ip'].startswith(("1.0.", "1.1.", "1.2."))]
+    # 过滤掉 1.0.x.x 等无效 IP
+    valid_ips = [i for i in ip_data if not i['ip'].startswith(("1.0.", "1.1.", "1.2."))]
     
     if valid_ips:
-        for item in valid_ips[:MAX_IP_COUNT]:
+        for item in valid_ips[:MAX_COUNT]:
             ip = item['ip']
+            # 备注包含延迟信息
             remark = f"CF_优选_{item.get('line','HK')}_{item.get('latency','0')}ms"
-            # 核心：地址用优选 IP，SNI 和 Host 必须用你验证过的域名
+            # 这里的参数必须和你之前“可用”的节点完全一致
             link = f"vless://{USER_ID}@{ip}:{PORT}?encryption=none&security=tls&sni={HOST}&type=ws&host={HOST}&path={PATH}#{remark}"
             links.append(link)
-    else:
-        # 如果彻底没抓到，生成你现在“可用”的那个域名节点保底
-        links.append(f"vless://{USER_ID}@{HOST}:{PORT}?encryption=none&security=tls&sni={HOST}&type=ws&host={HOST}&path={PATH}#保底域名节点")
+    
+    # 无论是否抓到 IP，都加上你那个“唯一可用”的域名节点作为终极保底
+    links.append(f"vless://{USER_ID}@{HOST}:{PORT}?encryption=none&security=tls&sni={HOST}&type=ws&host={HOST}&path={PATH}#域名保底_稳如老狗")
 
     combined = "\n".join(links)
     final_sub = base64.b64encode(combined.encode('utf-8')).decode('utf-8')
