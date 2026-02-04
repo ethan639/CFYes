@@ -1,40 +1,32 @@
-name: Auto Update CF IP
+name: Auto Update Sub
 
 on:
   schedule:
-    - cron: '0 */6 * * *'
-  workflow_dispatch:
+    - cron: '0 */6 * * *' # 每 6 小时自动更新一次
+  workflow_dispatch:      # 支持手动触发更新
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write # 必须显式声明写权限
     steps:
-      - name: Checkout
+      - name: Checkout code
         uses: actions/checkout@v3
-        with:
-          persist-credentials: true
 
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.9'
+          python-python: '3.9'
 
-      - name: Run script
-        run: |
-          pip install requests
-          python update.py
-          # 调试：查看生成的 sub.txt 大小
-          ls -lh sub.txt
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Run update script
+        run: python update.py
 
       - name: Commit and Push
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          git config --local user.name "github-actions[bot]"
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
           git add sub.txt
-          # 强制提交，即使内容看起来没变
-          git commit -m "Auto update sub: $(date)" || echo "No changes to commit"
-          git push origin main
+          git commit -m "Auto update sub: $(date)" || exit 0
+          git push
