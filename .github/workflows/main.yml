@@ -2,15 +2,19 @@ name: Auto Update CF IP
 
 on:
   schedule:
-    - cron: '0 */6 * * *' # 每 6 小时自动跑一次
-  workflow_dispatch:      # 支持手动点按钮运行
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions: # 显式声明读写权限
+      contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@v3
+        with:
+          persist-credentials: true
 
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -22,17 +26,12 @@ jobs:
           pip install requests
           python update.py
 
-      - name: Push result
+      - name: Commit and Push
         run: |
           git config --local user.email "actions@github.com"
-          git config --local user.name "GitHub Action"
-          # 检查 sub.txt 是否真的有内容
-          if [ -s sub.txt ]; then
-            git add -f sub.txt
-            # 如果没有变化则跳过，有变化则强制推送
-            git commit -m "Auto update subscription: $(date)" || echo "No changes to commit"
-            git push -f origin main
-          else
-            echo "错误：sub.txt 是空的，取消推送！"
-            exit 1
-          fi
+          git config --local user.name "github-actions[bot]"
+          git add sub.txt
+          # 仅在有变动时提交，避免工作流报错
+          git diff --quiet && git diff --staged --quiet || (git commit -m "Update sub: $(date)" && git push origin main)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
