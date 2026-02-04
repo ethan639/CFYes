@@ -5,21 +5,19 @@ import json
 # ================= 配置区 =================
 USER_ID = "f4055c9e-8500-4638-b13a-0e65fec24936"
 HOST = "cotco.dns-dynamic.net"
-PATH = "/"  # ！！！请务必确认你的服务端路径
+PATH = "/"  
 PORT = 443
 # ==========================================
 
-def get_all_ips():
+def get_ips():
     url = "https://api.hostmonit.com/get_optimization_ip"
+    # 模拟网页端请求，这是抓到多个 IP 的关键
     headers = {
         "Content-Type": "application/json",
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        "Origin": "https://stock.hostmonit.com",
         "Referer": "https://stock.hostmonit.com/"
     }
-    
-    all_nodes = []
-    # 分别请求 v4 的优选数据
+    # key 必须准确，这是该网站的公开接口密钥
     payload = {"key": "iDetkO9Z", "type": "v4"}
     
     try:
@@ -28,31 +26,32 @@ def get_all_ips():
         if res_data.get("code") == 200:
             return res_data.get("info", [])
     except Exception as e:
-        print(f"API 请求出错: {e}")
+        print(f"API 请求失败: {e}")
     return []
 
 def main():
-    ip_list = get_all_ips()
+    ip_list = get_ips()
     
-    if not ip_list:
-        print("未能从 API 获取到数据，生成域名备份节点...")
-        ip_list = [{"ip": HOST, "line": "Backup", "colo": "Domain", "latency": "0"}]
+    # 如果抓取到了真实的 IP 列表
+    if ip_list:
+        vless_links = []
+        for item in ip_list:
+            ip = item['ip']
+            # 备注显示：线路_地区_延迟
+            remark = f"CF_{item['line']}_{item['colo']}_{item['latency']}ms"
+            link = f"vless://{USER_ID}@{ip}:{PORT}?encryption=none&security=tls&sni={HOST}&type=ws&host={HOST}&path={PATH}#{remark}"
+            vless_links.append(link)
+    else:
+        # 如果还是抓不到，至少保留一个能用的备份节点，防止 sub.txt 为空
+        print("警告：未能抓取到优选 IP，执行备份逻辑")
+        vless_links = [f"vless://{USER_ID}@{HOST}:{PORT}?encryption=none&security=tls&sni={HOST}&type=ws&host={HOST}&path={PATH}#域名备份_测试延迟请重试"]
 
-    vless_links = []
-    # 限制抓取数量，防止订阅链接过长，通常取前 20 个最优 IP
-    for item in ip_list[:20]:
-        ip = item['ip']
-        # 备注包含：线路(移动/联通/电信)_地区_延迟
-        remark = f"CF_{item['line']}_{item['colo']}_{item['latency']}ms"
-        link = f"vless://{USER_ID}@{ip}:{PORT}?encryption=none&security=tls&sni={HOST}&type=ws&host={HOST}&path={PATH}#{remark}"
-        vless_links.append(link)
-    
     combined = "\n".join(vless_links)
     final_sub = base64.b64encode(combined.encode('utf-8')).decode('utf-8')
     
     with open("sub.txt", "w") as f:
         f.write(final_sub)
-    print(f"成功更新！共抓取到 {len(vless_links)} 个优选节点。")
+    print(f"任务完成，共生成 {len(vless_links)} 个节点")
 
 if __name__ == "__main__":
     main()
