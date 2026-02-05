@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 # 1. 你的 UUID
 USER_ID = os.environ.get("USER_ID", "63e36f02-9f04-4c72-b6b3-ccf59a72fff0")
 
-# 2. 目标域名（HOST/SNI），保留你的原始设置
+# 2. 目标域名（HOST/SNI），保留您的原始设置
 HOST = "gvm.cotco.dns-dynamic.net" 
 
 # 3. 接口配置
