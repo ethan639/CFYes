@@ -28,49 +28,51 @@ def get_optimization_ip():
 def main():
     res = get_optimization_ip()
     if not res or res.get("code") != 200:
-        print("未能获取到 IP 数据")
+        print("未能获取到数据")
         return
 
     # 生成北京时间时间戳 (UTC+8)
     utc_now = datetime.utcnow()
     beijing_time = (utc_now + timedelta(hours=8)).strftime("%H:%M")
 
-    # 1. 汇总所有线路数据
-    raw_ips = []
-    lines_map = {"CM": "移动", "CU": "联通", "CT": "电信"}
+    # 1. 定义线路抓取顺序 (匹配图中：移动 -> 联通 -> 电信)
+    lines_order = [
+        ("CM", "移动"),
+        ("CU", "联通"),
+        ("CT", "电信")
+    ]
     
     info_data = res.get("info", {})
-    for code, name in lines_map.items():
-        line_data = info_data.get(code, [])
-        for item in line_data:
-            item['line_name'] = name
-            raw_ips.append(item)
-
-    # 2. 根据延迟从小到大排序
-    def sort_key(x):
-        try:
-            return int(x.get("latency", "999").replace("ms", ""))
-        except:
-            return 999
-
-    sorted_ips = sorted(raw_ips, key=sort_key)
-
-    # 3. 生成链接
     links = []
-    for item in sorted_ips:
-        ip = item.get("ip")
-        name = item.get("line_name")
-        colo = item.get("colo", "Unknown")
-        latency = item.get("latency", "Unknown")
+
+    # 2. 核心逻辑：按线路顺序循环，每组内部单独按延迟排序
+    for code, name in lines_order:
+        line_data = info_data.get(code, [])
         
-        if not ip:
-            continue
+        # 定义内部排序规则：延迟由低到高
+        def sort_latency(x):
+            try:
+                return int(x.get("latency", "999").replace("ms", ""))
+            except:
+                return 999
         
-        # 备注格式：线路_地区_延迟_时间 (例如: 移动_LAX_51ms_08:45)
-        remark = f"{name}_{colo}_{latency}_{beijing_time}"
-        
-        link = f"vless://{USER_ID}@{ip}:{PORT}?encryption=none&security=tls&sni={HOST}&type=ws&host={HOST}&path={PATH}#{remark}"
-        links.append(link)
+        # 对当前线路内部进行排序
+        sorted_line_data = sorted(line_data, key=sort_latency)
+
+        # 3. 生成该线路的 VLESS 链接
+        for item in sorted_line_data:
+            ip = item.get("ip")
+            colo = item.get("colo", "Unknown")
+            latency = item.get("latency", "Unknown")
+            
+            if not ip:
+                continue
+            
+            # 备注格式：线路_地区_延迟_时间
+            remark = f"{name}_{colo}_{latency}_{beijing_time}"
+            
+            link = f"vless://{USER_ID}@{ip}:{PORT}?encryption=none&security=tls&sni={HOST}&type=ws&host={HOST}&path={PATH}#{remark}"
+            links.append(link)
 
     if not links:
         print("链接列表为空")
@@ -83,7 +85,7 @@ def main():
     with open("sub.txt", "w", encoding="utf-8") as f:
         f.write(final_sub)
     
-    print(f"[{beijing_time}] 成功更新 sub.txt，节点已按延迟排序并添加时间戳。")
+    print(f"[{beijing_time}] 成功更新 sub.txt！顺序已匹配图中列表：移动->联通->电信。")
 
 if __name__ == "__main__":
     main()
