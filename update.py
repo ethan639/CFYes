@@ -20,22 +20,36 @@ def get_data(ip_type='v4'):
     except:
         return None
 
+def safe_int_latency(latency_str):
+    """安全地将延迟字符串转换为整数，解决图13中的TypeError"""
+    if isinstance(latency_str, int):
+        return latency_str
+    try:
+        # 移除 'ms' 并转换
+        return int(str(latency_str).lower().replace("ms", "").strip())
+    except:
+        return 999
+
 def main():
+    # 获取北京时间
     beijing_time = (datetime.utcnow() + timedelta(hours=8)).strftime("%H:%M")
     all_links = []
     
-    # 按照 v4, v6 顺序抓取
+    # 按照 v4, v6 顺序处理
     for ip_ver in ['v4', 'v6']:
         res = get_data(ip_ver)
         if not res or res.get("code") != 200:
             continue
             
         info = res.get("info", {})
-        # 严格按照：移动 -> 联通 -> 电信 顺序
+        # 严格按照图中顺序：移动 -> 联通 -> 电信
         for code, name in [("CM", "移动"), ("CU", "联通"), ("CT", "电信")]:
             line_data = info.get(code, [])
-            # 组内按延迟排序
-            sorted_data = sorted(line_data, key=lambda x: int(x.get("latency", "999").replace("ms", "")) if "ms" in x.get("latency", "") else 999)
+            if not isinstance(line_data, list):
+                continue
+            
+            # 组内排序：由低到高
+            sorted_data = sorted(line_data, key=lambda x: safe_int_latency(x.get("latency", 999)))
             
             for item in sorted_data:
                 ip = item.get("ip")
@@ -43,16 +57,20 @@ def main():
                 lat = item.get("latency", "Unknown")
                 if not ip: continue
                 
-                # 别名格式优化
+                # 节点备注格式
                 tag = "IPv4" if ip_ver == 'v4' else "IPv6"
                 remark = f"{tag}_{name}_{colo}_{lat}_{beijing_time}"
+                
+                # 构造符合 v2rayN 规范的 VLESS 链接
                 link = f"vless://{USER_ID}@{ip}:{PORT}?encryption=none&security=tls&sni={HOST}&type=ws&host={HOST}&path={PATH}#{remark}"
                 all_links.append(link)
 
     if all_links:
+        # 进行最终的 Base64 编码导出
+        content = "\n".join(all_links)
         with open("sub.txt", "w", encoding="utf-8") as f:
-            f.write(base64.b64encode("\n".join(all_links).encode()).decode())
-        print(f"成功更新 {len(all_links)} 个节点")
+            f.write(base64.b64encode(content.encode('utf-8')).decode('utf-8'))
+        print(f"[{beijing_time}] 成功同步 {len(all_links)} 个节点到 sub.txt")
 
 if __name__ == "__main__":
     main()
