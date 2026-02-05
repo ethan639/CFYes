@@ -3,22 +3,33 @@ name: Update CF Nodes
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 * * * *' # 每小时整点自动执行
+    - cron: '0 * * * *' # 核心设置：每小时整点自动执行一次
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
         with:
           python-version: '3.9'
-      - run: pip install requests
-      - run: python update.py
+
+      - name: Install Dependencies
+        run: pip install requests
+
+      - name: Run Update Script
+        env:
+          USER_ID: ${{ secrets.USER_ID }}
+          HOST: ${{ secrets.HOST }}
+        run: python update.py
+
       - name: Commit and Push
         run: |
-          git config --global user.name "Action"
+          git config --global user.name "GitHub Action"
           git config --global user.email "action@github.com"
           git add sub.txt
-          git commit -m "update at $(date)" || exit 0
+          git commit -m "Auto-update nodes at $(date)" || exit 0
           git push
