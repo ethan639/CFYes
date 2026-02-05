@@ -20,14 +20,14 @@ def get_data(ip_type='v4'):
         if response.status_code == 200:
             return response.json()
     except Exception as e:
-        print(f"请求 {ip_type} 失败: {e}")
+        print(f"请求 {ip_ver} 失败: {e}")
     return None
 
 def main():
-    # 生成北京时间
+    # 生成北京时间用于节点重命名
     beijing_time = (datetime.utcnow() + timedelta(hours=8)).strftime("%H:%M")
     all_links = []
-    seen_ips = set() # 全局去重，彻底过滤移动/联通重复 IP
+    seen_ips = set() # 自动过滤移动/联通重复 IP
     
     for ip_ver in ['v4', 'v6']:
         res = get_data(ip_ver)
@@ -35,7 +35,7 @@ def main():
             continue
 
         info = res.get("info", {})
-        # 按照 移动 -> 电信 顺序排列
+        # 严格顺序：移动(CM) -> 电信(CT)
         for code, name in [("CM", "移动"), ("CT", "电信")]:
             line_data = info.get(code) or info.get(code.lower())
             if not line_data or not isinstance(line_data, list):
@@ -52,27 +52,28 @@ def main():
                 colo = item.get("colo", "Default")
                 lat_raw = str(item.get("latency", "Unknown")).lower().replace("ms", "")
                 
-                # 别名格式：移动_IPv4_LAX_53ms_10:07
+                # 别名格式：线路_版本_地区_延迟_时间
                 remark = f"{name}_{tag}_{colo}_{lat_raw}ms_{beijing_time}"
                 address = f"[{ip}]" if ":" in ip else ip
                 
-                # 构造 VLESS 链接
+                # 构造 VLESS 链接，保持 sni 和 host 为原域名
                 link = f"vless://{USER_ID}@{address}:{PORT}?encryption=none&security=tls&sni={HOST}&type=ws&host={HOST}&path={PATH}#{remark}"
                 all_links.append(link)
 
     if all_links:
-        # 核心修复点：
-        # 1. 使用 .strip() 确保内容前后没有多余空行
+        # 1. 先拼接所有链接并去除首尾空白
         content = "\n".join(all_links).strip()
-        # 2. 编码后强制移除所有换行符 (\n) 和回车符 (\r)，解决图 4/5/6/7 的报错
-        encoded_str = base64.b64encode(content.encode('utf-8')).decode('utf-8')
+        # 2. Base64 编码
+        encoded_bytes = base64.b64encode(content.encode('utf-8'))
+        encoded_str = encoded_bytes.decode('utf-8')
+        # 3. 核心修复：彻底剔除所有换行符和回车符，这是解决“导入失败”的关键
         final_content = encoded_str.replace('\n', '').replace('\r', '').strip()
         
         with open("sub.txt", "w", encoding="utf-8") as f:
             f.write(final_content)
-        print(f"[{beijing_time}] 订阅已生成，继续使用 HOST: {HOST}")
+        print(f"[{beijing_time}] 订阅已生成，包含 {len(all_links)} 个节点")
     else:
-        print("未发现有效节点")
+        print("未获取到数据")
 
 if __name__ == "__main__":
     main()
