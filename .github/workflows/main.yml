@@ -2,20 +2,20 @@ name: Auto Update Sub
 
 on:
   schedule:
-    - cron: '0 */6 * * *' # 每 6 小时自动更新一次
-  workflow_dispatch:      # 支持手动触发更新
+    - cron: '0 */6 * * *' # 每 6 小时自动运行
+  workflow_dispatch:      # 支持手动触发
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
-          python-python: '3.9'
+          python-version: '3.10' # 修正了之前的 python-python 错误
 
       - name: Install dependencies
         run: pip install requests
