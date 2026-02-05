@@ -33,9 +33,10 @@ def safe_int_latency(latency_val):
         return 999
 
 def main():
-    # 生成北京时间时间戳
     beijing_time = (datetime.utcnow() + timedelta(hours=8)).strftime("%H:%M")
     all_links = []
+    # 用于记录已存在的 IP，实现去重
+    seen_ips = set()
     
     # 按照 v4, v6 顺序处理
     for ip_ver in ['v4', 'v6']:
@@ -53,15 +54,18 @@ def main():
             
             for item in sorted_data:
                 ip = item.get("ip")
-                if not ip: continue
+                if not ip or ip in seen_ips: 
+                    continue # 如果 IP 为空或已存在，则跳过
+                
+                # 记录新 IP
+                seen_ips.add(ip)
                 
                 # 别名组件
                 tag = "IPv4" if ip_ver == 'v4' else "IPv6"
                 colo = item.get("colo", "Default")
                 lat_val = str(item.get("latency", "999")).lower().replace("ms", "")
                 
-                # 核心更正：严格执行 “线路名_IP版本_地区_延迟ms_时间”
-                # 例如：移动_IPv4_LAX_51ms_08:45
+                # 别名格式：线路_IP版本_地区_延迟ms_时间
                 remark = f"{name}_{tag}_{colo}_{lat_val}ms_{beijing_time}"
                 
                 # IPv6 地址加方括号
@@ -74,7 +78,7 @@ def main():
         content = "\n".join(all_links)
         with open("sub.txt", "w", encoding="utf-8") as f:
             f.write(base64.b64encode(content.encode('utf-8')).decode('utf-8'))
-        print(f"成功更新！格式已修正为：线路_IP版本_地区_延迟ms_时间")
+        print(f"成功更新！已自动去重，共保留 {len(all_links)} 个唯一 IP 节点。")
 
 if __name__ == "__main__":
     main()
