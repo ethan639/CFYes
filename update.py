@@ -12,7 +12,6 @@ KEY = "o1zrmHAF"
 # ==========================================
 
 def get_data(ip_type='v4'):
-    """获取数据，增加超时重试"""
     url = 'https://api.hostmonit.com/get_optimization_ip'
     data = {"key": KEY, "type": ip_type}
     try:
@@ -21,15 +20,12 @@ def get_data(ip_type='v4'):
             res_json = response.json()
             if res_json.get("code") == 200:
                 return res_json
-        print(f"[{ip_type}] 接口返回异常: {response.status_code}")
-    except Exception as e:
-        print(f"[{ip_type}] 网络请求失败: {e}")
+    except:
+        pass
     return None
 
 def safe_int_latency(latency_val):
-    """鲁棒的延迟解析逻辑"""
-    if latency_val is None:
-        return 999
+    if latency_val is None: return 999
     s = str(latency_val).lower().replace("ms", "").strip()
     try:
         return int(float(s))
@@ -37,42 +33,39 @@ def safe_int_latency(latency_val):
         return 999
 
 def main():
-    # 生成北京时间时间戳 (UTC+8)
+    # 生成北京时间时间戳
     beijing_time = (datetime.utcnow() + timedelta(hours=8)).strftime("%H:%M")
     all_links = []
     
-    # 按照要求顺序：先 v4 后 v6
+    # 按照 v4, v6 顺序处理
     for ip_ver in ['v4', 'v6']:
-        print(f"正在处理 {ip_ver}...")
         res = get_data(ip_ver)
-        if not res:
-            continue
+        if not res: continue
             
         info = res.get("info", {})
-        # 严格按照图示顺序：移动 -> 联通 -> 电信
+        # 严格顺序：移动 -> 联通 -> 电信
         for code, name in [("CM", "移动"), ("CU", "联通"), ("CT", "电信")]:
             line_data = info.get(code, [])
-            if not isinstance(line_data, list):
-                continue
+            if not isinstance(line_data, list): continue
             
-            # 组内按延迟排序
+            # 内部按延迟排序
             sorted_data = sorted(line_data, key=lambda x: safe_int_latency(x.get("latency", 999)))
             
             for item in sorted_data:
                 ip = item.get("ip")
                 if not ip: continue
                 
-                # 针对 IPv6 地址添加方括号
-                address = f"[{ip}]" if ":" in ip else ip
-                
-                colo = item.get("colo", "Default")
-                # 确保延迟显示带有 ms 单位
-                lat_raw = str(item.get("latency", "Unknown"))
-                lat_display = lat_raw if "ms" in lat_raw.lower() else f"{lat_raw}ms"
-                
-                # 别名优化：移动_IPv4_LAX_51ms_08:45
+                # 别名组件
                 tag = "IPv4" if ip_ver == 'v4' else "IPv6"
-                remark = f"{name}_{tag}_{colo}_{lat_display}_{beijing_time}"
+                colo = item.get("colo", "Default")
+                lat_val = str(item.get("latency", "999")).lower().replace("ms", "")
+                
+                # 核心更正：严格执行 “线路名_IP版本_地区_延迟ms_时间”
+                # 例如：移动_IPv4_LAX_51ms_08:45
+                remark = f"{name}_{tag}_{colo}_{lat_val}ms_{beijing_time}"
+                
+                # IPv6 地址加方括号
+                address = f"[{ip}]" if ":" in ip else ip
                 
                 link = f"vless://{USER_ID}@{address}:{PORT}?encryption=none&security=tls&sni={HOST}&type=ws&host={HOST}&path={PATH}#{remark}"
                 all_links.append(link)
@@ -81,9 +74,7 @@ def main():
         content = "\n".join(all_links)
         with open("sub.txt", "w", encoding="utf-8") as f:
             f.write(base64.b64encode(content.encode('utf-8')).decode('utf-8'))
-        print(f"[{beijing_time}] 成功同步 {len(all_links)} 个节点。格式已优化。")
-    else:
-        print("未获取到节点数据。")
+        print(f"成功更新！格式已修正为：线路_IP版本_地区_延迟ms_时间")
 
 if __name__ == "__main__":
     main()
