@@ -35,10 +35,8 @@ def safe_int_latency(latency_val):
 def main():
     beijing_time = (datetime.utcnow() + timedelta(hours=8)).strftime("%H:%M")
     all_links = []
-    # 用于记录已存在的 IP，实现去重
     seen_ips = set()
     
-    # 按照 v4, v6 顺序处理
     for ip_ver in ['v4', 'v6']:
         res = get_data(ip_ver)
         if not res: continue
@@ -49,28 +47,25 @@ def main():
             line_data = info.get(code, [])
             if not isinstance(line_data, list): continue
             
-            # 内部按延迟排序
-            sorted_data = sorted(line_data, key=lambda x: safe_int_latency(x.get("latency", 999)))
+            # 过滤掉延迟异常的数据（如 0ms 或 超过 1000ms）
+            valid_data = [item for item in line_data if 0 < safe_int_latency(item.get("latency")) < 1000]
+            sorted_data = sorted(valid_data, key=lambda x: safe_int_latency(x.get("latency", 999)))
             
             for item in sorted_data:
                 ip = item.get("ip")
-                if not ip or ip in seen_ips: 
-                    continue # 如果 IP 为空或已存在，则跳过
+                if not ip or ip in seen_ips: continue
                 
-                # 记录新 IP
                 seen_ips.add(ip)
                 
-                # 别名组件
                 tag = "IPv4" if ip_ver == 'v4' else "IPv6"
                 colo = item.get("colo", "Default")
-                lat_val = str(item.get("latency", "999")).lower().replace("ms", "")
+                lat_val = str(item.get("latency", "Unknown")).lower().replace("ms", "")
                 
                 # 别名格式：线路_IP版本_地区_延迟ms_时间
                 remark = f"{name}_{tag}_{colo}_{lat_val}ms_{beijing_time}"
-                
-                # IPv6 地址加方括号
                 address = f"[{ip}]" if ":" in ip else ip
                 
+                # 构造节点
                 link = f"vless://{USER_ID}@{address}:{PORT}?encryption=none&security=tls&sni={HOST}&type=ws&host={HOST}&path={PATH}#{remark}"
                 all_links.append(link)
 
@@ -78,7 +73,7 @@ def main():
         content = "\n".join(all_links)
         with open("sub.txt", "w", encoding="utf-8") as f:
             f.write(base64.b64encode(content.encode('utf-8')).decode('utf-8'))
-        print(f"成功更新！已自动去重，共保留 {len(all_links)} 个唯一 IP 节点。")
+        print(f"[{beijing_time}] 更新完成：去重后保留 {len(all_links)} 个节点")
 
 if __name__ == "__main__":
     main()
