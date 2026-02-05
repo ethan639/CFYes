@@ -1,32 +1,35 @@
-name: Auto Update Sub
+name: Update CF Subscription
 
 on:
+  workflow_dispatch:
   schedule:
-    - cron: '0 */6 * * *' # 每 6 小时自动运行
-  workflow_dispatch:      # 支持手动触发
+    - cron: '0 * * * *' # 每小时整点自动执行一次
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - name: Checkout Repository
+        uses: actions/checkout@v3
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v4
         with:
-          python-version: '3.10' # 修正了之前的 python-python 错误
+          python-version: '3.9'
 
-      - name: Install dependencies
+      - name: Install Dependencies
         run: pip install requests
 
-      - name: Run update script
+      - name: Run Update Script
+        env:
+          USER_ID: ${{ secrets.USER_ID }} # 建议在 GitHub Secrets 中设置
+          HOST: ${{ secrets.HOST }}
         run: python update.py
 
       - name: Commit and Push
         run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
+          git config --global user.name "GitHub Action"
+          git config --global user.email "action@github.com"
           git add sub.txt
-          git commit -m "Auto update sub: $(date)" || exit 0
+          git commit -m "Auto-update nodes at $(date)" || exit 0
           git push
