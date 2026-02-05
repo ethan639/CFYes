@@ -1,35 +1,32 @@
-name: Auto Update Nodes
+name: Auto Update Sub
 
 on:
   schedule:
-    - cron: '0 */1 * * *' # 每小时运行一次
-  workflow_dispatch:      # 允许手动运行
+    - cron: '0 */1 * * *' # 每 6 小时自动运行
+  workflow_dispatch:      # 支持手动触发
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.9'
+          python-version: '3.10' # 修正了之前的 python-python 错误
 
       - name: Install dependencies
         run: pip install requests
 
-      - name: Run Script
+      - name: Run update script
         run: python update.py
-        env:
-          USER_ID: ${{ secrets.USER_ID }} # 建议将关键信息放在 Secrets 中
 
       - name: Commit and Push
         run: |
-          git config --global user.name "actions-user"
-          git config --global user.email "actions@github.com"
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
           git add sub.txt
-          # 只有当文件有变动时才提交，防止图 8 中的重复 commit
-          git commit -m "Auto-update nodes at $(date)" || exit 0
+          git commit -m "Auto update sub: $(date)" || exit 0
           git push
