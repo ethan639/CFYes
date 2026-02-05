@@ -1,5 +1,4 @@
 import requests
-import base64
 import os
 from datetime import datetime, timedelta
 
@@ -45,17 +44,14 @@ def main():
                 remark = f"{name}_{tag}_{colo}_{lat}ms_{beijing_time}"
                 address = f"[{ip}]" if ":" in ip else ip
                 
+                # 保持原域名
                 link = f"vless://{USER_ID}@{address}:{PORT}?encryption=none&security=tls&sni={HOST}&type=ws&host={HOST}&path={PATH}#{remark}"
                 all_links.append(link)
 
     if all_links:
-        # 核心：确保内容是纯粹的一行且没有任何尾部空格
+        # 直接写入明文链接，每行一个。这能彻底解决 Base64 导致的“导入失败”
         content = "\n".join(all_links).strip()
-        # 编码并彻底清除所有换行符
-        encoded_str = base64.b64encode(content.encode('utf-8')).decode('utf-8')
-        final_content = "".join(encoded_str.split()) # 终极手段：移除所有空白符
         
-        # 使用 'wb' 模式写入，防止 Python 自动添加系统换行符
-        with open("sub.txt", "wb") as f:
-            f.write(final_content.encode('utf-8'))
-        print(f"[{beijing_time}] 生成成功，节点数: {len(all_links)}")
+        with open("sub.txt", "w", encoding="utf-8") as f:
+            f.write(content)
+        print(f"[{beijing_time}] 成功生成 {len(all_links)} 个明文节点")
