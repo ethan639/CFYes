@@ -3,6 +3,7 @@ import os
 from datetime import datetime, timedelta
 
 # ================= 配置区 =================
+# 建议在 GitHub Secrets 中设置 USER_ID 以保护安全
 USER_ID = os.environ.get("USER_ID", "63e36f02-9f04-4c72-b6b3-ccf59a72fff0")
 HOST = "gvm.cotco.dns-dynamic.net" 
 PATH = "/"
@@ -41,17 +42,24 @@ def main():
                 colo = item.get("colo", "Default")
                 lat = str(item.get("latency", "0")).lower().replace("ms", "")
                 
+                # 别名格式匹配图 4: 线路_版本_地区_延迟_时间
                 remark = f"{name}_{tag}_{colo}_{lat}ms_{beijing_time}"
                 address = f"[{ip}]" if ":" in ip else ip
                 
-                # 保持原域名
+                # 构造 VLESS 链接
                 link = f"vless://{USER_ID}@{address}:{PORT}?encryption=none&security=tls&sni={HOST}&type=ws&host={HOST}&path={PATH}#{remark}"
                 all_links.append(link)
 
     if all_links:
-        # 直接写入明文链接，每行一个。这能彻底解决 Base64 导致的“导入失败”
+        # 核心改动：不再进行 Base64 编码，直接保存明文链接
+        # 这种方式 100% 避免了因编码换行导致的导入失败
         content = "\n".join(all_links).strip()
         
         with open("sub.txt", "w", encoding="utf-8") as f:
             f.write(content)
-        print(f"[{beijing_time}] 成功生成 {len(all_links)} 个明文节点")
+        print(f"[{beijing_time}] 成功生成 {len(all_links)} 个节点")
+    else:
+        print("未获取到节点数据")
+
+if __name__ == "__main__":
+    main()
